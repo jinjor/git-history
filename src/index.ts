@@ -9,8 +9,43 @@ export type Log = {
   author_name: string;
 };
 
+export interface Analyzer<A> {
+  filter?: (log: Log) => boolean;
+  map: (log: Log) => Promise<A>;
+  max?: number;
+}
+
+export class AnalyzerResult<A> {
+  constructor(
+    private hashes: string[],
+    private getDataPath: (hash: string) => string
+  ) {}
+  async reduce<B>(
+    f: (accumulator: B, value: A) => B,
+    firstValue: B
+  ): Promise<B> {
+    let value = firstValue;
+    for (const hash of this.hashes) {
+      const dataPath = this.getDataPath(hash);
+      const data = JSON.parse(await fs.readFile(dataPath, "utf8"));
+      value = f(value, data);
+    }
+    return value;
+  }
+  async all(): Promise<A[]> {
+    return this.reduce((arr, data) => {
+      arr.push(data);
+      return arr;
+    }, []);
+  }
+}
+
 export class GitHistory {
-  constructor(public workspace: string) {}
+  constructor(
+    public workspace: string,
+    public repoUrl: string,
+    public branch: string
+  ) {}
   getRepoPath(): string {
     return path.join(this.workspace, "repo");
   }
@@ -23,85 +58,27 @@ export class GitHistory {
   getDataPath(hash: string): string {
     return path.join(this.getRevPath(hash), "data");
   }
-  private async ensureDir(path: string): Promise<void> {
-    if (!(await fs.exists(path))) {
-      await fs.mkdir(path);
-    }
-  }
   private async ensureWorkspace(): Promise<void> {
-    await this.ensureDir(this.workspace);
-    await this.ensureDir(this.getRevsPath());
+    await fs.ensureDir(this.workspace);
+    await fs.ensureDir(this.getRevsPath());
   }
-  private async ensureRepo(repoUrl: string, branch: string): Promise<void> {
-    const repoPath = this.getRepoPath();
-    if (!(await fs.exists(repoPath))) {
-      await this.clone(repoUrl, branch);
+  private async ensureRepo(): Promise<void> {
+    if (!(await fs.exists(this.getRepoPath()))) {
+      await this.clone();
     }
   }
   private async ensureRev(hash: string): Promise<void> {
     const revPath = await this.getRevPath(hash);
-    if (!(await fs.exists(revPath))) {
-      await fs.mkdir(revPath);
-    }
+    await fs.ensureDir(revPath);
   }
-  private async clone(repoUrl: string, branch: string): Promise<void> {
-    console.log(`Cloning ${repoUrl} ...`);
-    await simplegit(this.workspace).clone(repoUrl, "repo", ["-b", branch]);
+  private async clone(): Promise<void> {
+    console.log(`Cloning ${this.branch} of ${this.repoUrl} ...`);
+    await simplegit(this.workspace).clone(this.repoUrl, "repo", [
+      "-b",
+      this.branch
+    ]);
   }
-  async analyze(
-    repoUrl: string,
-    branch: string,
-    filter: (log: Log) => boolean,
-    mapper: (log: Log) => Promise<unknown>,
-    max?: number
-  ): Promise<string[]> {
-    await this.ensureWorkspace();
-    await this.ensureRepo(repoUrl, branch);
-    const git = simplegit(this.getRepoPath());
-    await git.checkout(branch);
-    await git.pull();
-    const logs = await this.getLogs(max, filter);
-    for (let i = 0; i < logs.length; i++) {
-      process.stdout.write(
-        `Analyzing ${i + 1}/${logs.length}`.padEnd(30) + "\r"
-      );
-      const log = logs[i];
-      await this.ensureRev(log.hash);
-      const dataPath = await this.getDataPath(log.hash);
-      if (!(await fs.exists(dataPath))) {
-        await git.checkout(log.hash);
-        const result = await mapper(log);
-        const data = JSON.stringify(result || null, null, 2);
-        await fs.writeFile(dataPath, data);
-      }
-    }
-    process.stdout.write("Analysing done.".padEnd(30) + "\n");
-    return logs.map(l => l.hash);
-  }
-  private async reduce<A, B>(
-    hashes: string[],
-    f: (accumulator: B, value: A) => B,
-    firstValue?: B
-  ): Promise<B> {
-    let value = firstValue;
-    for (const hash of hashes) {
-      const dataPath = this.getDataPath(hash);
-      const data = JSON.parse(await fs.readFile(dataPath, "utf8"));
-      value = f(value, data);
-    }
-    return value;
-  }
-  async getAllData(hashes: string[]): Promise<unknown[]> {
-    return this.reduce(
-      hashes,
-      (arr, data) => {
-        arr.push(data);
-        return arr;
-      },
-      []
-    );
-  }
-  async getLogs(
+  private async getLogs(
     max: number,
     filter: (log: Log) => boolean
   ): Promise<readonly Log[]> {
@@ -120,6 +97,34 @@ export class GitHistory {
       `Got ${logs.all.length} logs and narrowed it to ${filtered.length}.`
     );
     return filtered;
+  }
+  async analyze<A, B>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
+    const { filter = () => true, map, max } = analyzer;
+    await this.ensureWorkspace();
+    await this.ensureRepo();
+    const git = simplegit(this.getRepoPath());
+    await git.checkout(this.branch);
+    await git.pull();
+    const logs = await this.getLogs(max, filter);
+    for (let i = 0; i < logs.length; i++) {
+      process.stdout.write(
+        `Analyzing ${i + 1}/${logs.length}`.padEnd(30) + "\r"
+      );
+      const log = logs[i];
+      await this.ensureRev(log.hash);
+      const dataPath = await this.getDataPath(log.hash);
+      if (!(await fs.exists(dataPath))) {
+        await git.checkout(log.hash);
+        const result = await map(log);
+        const data = JSON.stringify(result || null, null, 2);
+        await fs.writeFile(dataPath, data);
+      }
+    }
+    process.stdout.write("Analysing done.".padEnd(30) + "\n");
+    return new AnalyzerResult(
+      logs.map(l => l.hash),
+      this.getDataPath.bind(this)
+    );
   }
   async clearCache(): Promise<void> {
     const revsPath = this.getRevsPath();

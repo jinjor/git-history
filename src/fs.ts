@@ -7,3 +7,8 @@ export const readFile = util.promisify(fs.readFile);
 export const writeFile = util.promisify(fs.writeFile);
 export const mkdir = util.promisify(fs.mkdir);
 export const rimraf = util.promisify(_rimraf);
+export async function ensureDir(path: string): Promise<void> {
+  if (!(await exists(path))) {
+    await mkdir(path);
+  }
+}
