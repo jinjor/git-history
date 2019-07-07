@@ -1,4 +1,4 @@
-import { run } from "./lang-history";
+import { run, example } from "./lang-history";
 
 const user = process.env.GITHUB_USER;
 if (!user) {
@@ -13,11 +13,13 @@ if (!user) {
   throw new Error("GITHUB_REPO is required.");
 }
 const url = `https://${user}:${token}@github.com/${repo}.git`;
-const workspace = "work";
 const branch = "master";
 const out = "result.html";
 
-run(workspace, url, branch, out)
+(async () => {
+  await run(url, branch, out);
+  await example(user, token);
+})()
   .then(_ => {
     console.log("done.");
   })

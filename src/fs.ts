@@ -9,6 +9,6 @@ export const mkdir = util.promisify(fs.mkdir);
 export const rimraf = util.promisify(_rimraf);
 export async function ensureDir(path: string): Promise<void> {
   if (!(await exists(path))) {
-    await mkdir(path);
+    await mkdir(path, { recursive: true });
   }
 }

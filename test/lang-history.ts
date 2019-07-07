@@ -8,14 +8,9 @@ import { Lang, ts, elm, rs } from "./lang";
 type Langs = { [key: string]: number };
 type Result = { hash: string; date: string; author_name: string; langs: Langs };
 
-export async function run(
-  workspace: string,
-  url: string,
-  branch: string,
-  out: string
-) {
+export async function run(url: string, branch: string, out: string) {
   const langs = [ts, elm, rs];
-  const analyzer = new GitHistory(workspace, url, branch);
+  const analyzer = new GitHistory("work/test", url, branch);
   const result = await analyzer.analyze({
     filter: log => {
       return log.message.startsWith("Merge pull request ");
@@ -74,4 +69,22 @@ function render(result: Result[], langs: Lang[]): string {
       });
     </script>
   `;
+}
+
+export async function example(user: string, passwordOrToken: string) {
+  const gitHistory = new GitHistory(
+    "work/example",
+    `https://${user}:${passwordOrToken}@github.com/jinjor/git-history.git`,
+    "master"
+  );
+  const result = await gitHistory.analyze({
+    map: async log => {
+      const files = await glob([`**/*.ts`], {
+        cwd: gitHistory.getRepoPath()
+      });
+      return files.length;
+    }
+  });
+  const data = await result.all();
+  console.log(data);
 }
