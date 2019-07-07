@@ -20,14 +20,17 @@ export class AnalyzerResult<A> {
     private hashes: string[],
     private getDataPath: (hash: string) => string
   ) {}
+  private async getRevData(hash: string): Promise<A> {
+    const dataPath = this.getDataPath(hash);
+    return JSON.parse(await fs.readFile(dataPath, "utf8"));
+  }
   async reduce<B>(
     f: (accumulator: B, value: A) => B,
     firstValue: B
   ): Promise<B> {
     let value = firstValue;
     for (const hash of this.hashes) {
-      const dataPath = this.getDataPath(hash);
-      const data = JSON.parse(await fs.readFile(dataPath, "utf8"));
+      const data = await this.getRevData(hash);
       value = f(value, data);
     }
     return value;
@@ -49,13 +52,13 @@ export class GitHistory {
   getRepoPath(): string {
     return path.join(this.workspace, "repo");
   }
-  getRevsPath(): string {
+  private getRevsPath(): string {
     return path.join(this.workspace, "revs");
   }
-  getRevPath(hash: string): string {
+  private getRevPath(hash: string): string {
     return path.join(this.getRevsPath(), hash);
   }
-  getDataPath(hash: string): string {
+  private getDataPath(hash: string): string {
     return path.join(this.getRevPath(hash), "data");
   }
   private async ensureWorkspace(): Promise<void> {
@@ -72,11 +75,13 @@ export class GitHistory {
     await fs.ensureDir(revPath);
   }
   private async clone(): Promise<void> {
-    console.log(`Cloning ${this.branch} of ${this.repoUrl} ...`);
+    process.stdout.write(`Cloning ${this.branch} ...\r`);
     await simplegit(this.workspace).clone(this.repoUrl, "repo", [
       "-b",
       this.branch
     ]);
+    process.stdout.write("".padEnd(50) + "\r");
+    console.log(`Cloning ${this.branch} done.`);
   }
   private async getLogs(
     max: number,
@@ -120,7 +125,8 @@ export class GitHistory {
         await fs.writeFile(dataPath, data);
       }
     }
-    process.stdout.write("Analysing done.".padEnd(30) + "\n");
+    process.stdout.write("".padEnd(30) + "\r");
+    console.log("Analyzing done.");
     const hashes = logs.map(l => l.hash);
     hashes.reverse();
     return new AnalyzerResult(hashes, this.getDataPath.bind(this));

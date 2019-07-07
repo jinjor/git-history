@@ -8,22 +8,6 @@ import { Lang, ts, elm, rs } from "./lang";
 type Langs = { [key: string]: number };
 type Result = { hash: string; date: string; author_name: string; langs: Langs };
 
-async function analyze(
-  repoPath: string,
-  log: Log,
-  languages: Lang[]
-): Promise<Result> {
-  const entries = await glob(languages.map(l => `**/*.${l.ext}`), {
-    cwd: repoPath
-  });
-  const langs: Langs = {};
-  for (const entry of entries) {
-    const ext = path.extname(entry as string);
-    langs[ext] = (langs[ext] || 0) + 1;
-  }
-  return { ...log, langs };
-}
-
 export async function run(
   workspace: string,
   url: string,
@@ -43,6 +27,22 @@ export async function run(
   const data = await result.all();
   const html = render(data, langs);
   await util.promisify(fs.writeFile)(out, html);
+}
+
+async function analyze(
+  repoPath: string,
+  log: Log,
+  languages: Lang[]
+): Promise<Result> {
+  const entries = await glob(languages.map(l => `**/*.${l.ext}`), {
+    cwd: repoPath
+  });
+  const langs: Langs = {};
+  for (const entry of entries) {
+    const ext = path.extname(entry as string);
+    langs[ext] = (langs[ext] || 0) + 1;
+  }
+  return { ...log, langs };
 }
 
 function makeDataset(lang: Lang, result: Result[]) {
