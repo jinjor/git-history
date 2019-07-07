@@ -1,0 +1,22 @@
+{
+  "name": "git-history",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "ts-node test/test.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "rimraf": "^2.6.3",
+    "simple-git": "^1.118.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.0.12",
+    "@types/rimraf": "^2.0.2",
+    "fast-glob": "^3.0.4",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.2"
+  }
+}
