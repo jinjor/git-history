@@ -103,7 +103,7 @@ export class GitHistory {
     );
     return filtered;
   }
-  async analyze<A, B>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
+  async analyze<A>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
     const { filter = () => true, map, max } = analyzer;
     await this.ensureWorkspace();
     await this.ensureRepo();

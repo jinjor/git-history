@@ -29,7 +29,7 @@ async function analyze(
   log: Log,
   languages: Lang[]
 ): Promise<Result> {
-  const entries = await glob(languages.map(l => `**/*.${l.ext}`), {
+  const entries = await glob(languages.map(l => `**/*${l.ext}`), {
     cwd: repoPath
   });
   const langs: Langs = {};
@@ -53,7 +53,7 @@ function makeDataset(lang: Lang, result: Result[]) {
 
 function render(result: Result[], langs: Lang[]): string {
   const data = {
-    labels: langs.map(l => l.ext),
+    labels: result.map(r => r.date.slice(0, 10)),
     datasets: langs.map(l => makeDataset(l, result))
   };
   return `
@@ -69,22 +69,4 @@ function render(result: Result[], langs: Lang[]): string {
       });
     </script>
   `;
-}
-
-export async function example(user: string, passwordOrToken: string) {
-  const gitHistory = new GitHistory(
-    "work/example",
-    `https://${user}:${passwordOrToken}@github.com/jinjor/git-history.git`,
-    "master"
-  );
-  const result = await gitHistory.analyze({
-    map: async log => {
-      const files = await glob([`**/*.ts`], {
-        cwd: gitHistory.getRepoPath()
-      });
-      return files.length;
-    }
-  });
-  const data = await result.all();
-  console.log(data);
 }

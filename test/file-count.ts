@@ -1,18 +1,7 @@
-# Git History
-
-A utility to analyze the history of Git repository.
-
-## Why?
-
-It's boring to traverse history, make temporary directories, cache results, etc.
-
-## Usage
-
-```typescript
-import { GitHistory } from "git-history";
+import { GitHistory } from "../src";
 import * as glob from "fast-glob";
 
-async function run(user: string, passwordOrToken: string) {
+export async function run(user: string, passwordOrToken: string) {
   const gitHistory = new GitHistory(
     "work/example",
     `https://${user}:${passwordOrToken}@github.com/jinjor/git-history.git`,
@@ -30,8 +19,3 @@ async function run(user: string, passwordOrToken: string) {
   const data = await result.all(); // or use `reduce` if data is too large.
   console.log(data); // [ 2, 2, 4, ... ]
 }
-```
-
-## LICENSE
-
-MIT

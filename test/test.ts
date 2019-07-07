@@ -1,4 +1,5 @@
-import { run, example } from "./lang-history";
+import * as ex1 from "./lang-history";
+import * as ex2 from "./file-count";
 
 const user = process.env.GITHUB_USER;
 if (!user) {
@@ -9,16 +10,16 @@ if (!token) {
   throw new Error("GITHUB_TOKEN is required.");
 }
 const repo = process.env.GITHUB_REPO;
-if (!user) {
+if (!repo) {
   throw new Error("GITHUB_REPO is required.");
 }
 const url = `https://${user}:${token}@github.com/${repo}.git`;
 const branch = "master";
-const out = "result.html";
+const out = "work/result.html";
 
 (async () => {
-  await run(url, branch, out);
-  await example(user, token);
+  await ex1.run(url, branch, out);
+  await ex2.run(user, token);
 })()
   .then(_ => {
     console.log("done.");
