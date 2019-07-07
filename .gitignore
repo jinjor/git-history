@@ -1,4 +1,4 @@
 node_modules
 work
-test
+test/test.ts
 result.html

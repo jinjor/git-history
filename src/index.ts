@@ -121,10 +121,9 @@ export class GitHistory {
       }
     }
     process.stdout.write("Analysing done.".padEnd(30) + "\n");
-    return new AnalyzerResult(
-      logs.map(l => l.hash),
-      this.getDataPath.bind(this)
-    );
+    const hashes = logs.map(l => l.hash);
+    hashes.reverse();
+    return new AnalyzerResult(hashes, this.getDataPath.bind(this));
   }
   async clearCache(): Promise<void> {
     const revsPath = this.getRevsPath();
