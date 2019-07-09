@@ -5,6 +5,7 @@ import * as fs from "./fs";
 export type Log = {
   hash: string;
   date: string;
+  refs: string;
   message: string;
   author_name: string;
 };
@@ -93,6 +94,7 @@ export class GitHistory {
       format: {
         hash: "%h",
         date: "%ai",
+        refs: "%D",
         message: "%s",
         author_name: "%aN"
       }
