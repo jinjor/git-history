@@ -1,4 +1,4 @@
-import { GitHistory, Log } from "../src";
+import { GitHistory, DefaultLogFields } from "../src";
 import * as glob from "fast-glob";
 import * as path from "path";
 import * as fs from "fs";
@@ -6,12 +6,25 @@ import * as util from "util";
 import { Lang, ts, elm, rs } from "./lang";
 
 type Langs = { [key: string]: number };
-type Result = { hash: string; date: string; author_name: string; langs: Langs };
+type Result = { hash: string; date: string; langs: Langs };
+type Log = {
+  hash: string;
+  date: string;
+  message: string;
+  refs: string;
+};
 
 export async function run(url: string, branch: string, out: string) {
   const langs = [ts, elm, rs];
   const analyzer = new GitHistory("work/test", url, branch);
   const result = await analyzer.analyze({
+    format: {
+      hash: "%h",
+      date: "%cd",
+      message: "%s",
+      refs: "%D"
+    },
+    dateFormat: "%Y/%m/%d",
     filter: log => {
       return log.message.startsWith("Merge pull request ");
     },
@@ -53,7 +66,7 @@ function makeDataset(lang: Lang, result: Result[]) {
 
 function render(result: Result[], langs: Lang[]): string {
   const data = {
-    labels: result.map(r => r.date.slice(0, 10)),
+    labels: result.map(r => r.date),
     datasets: langs.map(l => makeDataset(l, result))
   };
   return `

@@ -2,19 +2,23 @@ import * as simplegit from "simple-git/promise";
 import * as path from "path";
 import * as fs from "./fs";
 
-export type Log = {
+export interface DefaultLogFields {
   hash: string;
   date: string;
-  refs: string;
   message: string;
+  refs: string;
+  body: string;
   author_name: string;
-};
+  author_email: string;
+}
 
-export interface Analyzer<A> {
-  filter?: (log: Log) => boolean;
-  map: (log: Log) => Promise<A>;
-  max?: number;
+export interface Analyzer<A, L> {
   name?: string;
+  filter?: (log: L) => boolean;
+  map: (log: L) => Promise<A>;
+  max?: number;
+  format?: L;
+  dateFormat?: string;
 }
 
 export class AnalyzerResult<A> {
@@ -84,20 +88,17 @@ export class GitHistory {
     process.stdout.write("".padEnd(50) + "\r");
     console.log(`Cloning ${this.branch} done.`);
   }
-  private async getLogs(
+  private async getLogs<L>(
     max: number,
-    filter: (log: Log) => boolean
-  ): Promise<readonly Log[]> {
+    filter: (log: L) => boolean,
+    format: L,
+    dateFormat: string
+  ): Promise<readonly L[]> {
     const git = simplegit(this.getRepoPath());
     const logs = await git.log({
       ...(max ? { "--max-count": String(max) } : {}),
-      format: {
-        hash: "%h",
-        date: "%ai",
-        refs: "%D",
-        message: "%s",
-        author_name: "%aN"
-      }
+      ...(dateFormat ? { "--date": `format:'${dateFormat}'` } : {}),
+      format
     });
     const filtered = logs.all.filter(filter);
     console.log(
@@ -105,15 +106,24 @@ export class GitHistory {
     );
     return filtered;
   }
-  async analyze<A>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
-    const { filter = () => true, map, max, name = "default" } = analyzer;
+  async analyze<A, L extends { hash: string } = DefaultLogFields>(
+    analyzer: Analyzer<A, L>
+  ): Promise<AnalyzerResult<A>> {
+    const {
+      filter = () => true,
+      map,
+      max,
+      name = "default",
+      format,
+      dateFormat
+    } = analyzer;
     await this.ensureWorkspace();
     await this.ensureRevs(name);
     await this.ensureRepo();
     const git = simplegit(this.getRepoPath());
     await git.checkout(this.branch);
     await git.pull();
-    const logs = await this.getLogs(max, filter);
+    const logs = await this.getLogs(max, filter, format, dateFormat);
     for (let i = 0; i < logs.length; i++) {
       process.stdout.write(
         `Analyzing ${i + 1}/${logs.length}`.padEnd(30) + "\r"
