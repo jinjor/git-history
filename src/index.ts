@@ -13,15 +13,16 @@ export interface Analyzer<A> {
   filter?: (log: Log) => boolean;
   map: (log: Log) => Promise<A>;
   max?: number;
+  name?: string;
 }
 
 export class AnalyzerResult<A> {
   constructor(
     private hashes: string[],
-    private getDataPath: (hash: string) => string
+    private getRevPath: (hash: string) => string
   ) {}
   private async getRevData(hash: string): Promise<A> {
-    const dataPath = this.getDataPath(hash);
+    const dataPath = this.getRevPath(hash);
     return JSON.parse(await fs.readFile(dataPath, "utf8"));
   }
   async reduce<B>(
@@ -52,27 +53,26 @@ export class GitHistory {
   getRepoPath(): string {
     return path.join(this.workspace, "repo");
   }
-  private getRevsPath(): string {
-    return path.join(this.workspace, "revs");
+  private getDataPath(): string {
+    return path.join(this.workspace, "data");
   }
-  private getRevPath(hash: string): string {
-    return path.join(this.getRevsPath(), hash);
+  private getRevsPath(name: string): string {
+    return path.join(this.getDataPath(), name);
   }
-  private getDataPath(hash: string): string {
-    return path.join(this.getRevPath(hash), "data");
+  private getRevPath(name: string, hash: string): string {
+    return path.join(this.getRevsPath(name), hash);
   }
   private async ensureWorkspace(): Promise<void> {
     await fs.ensureDir(this.workspace);
-    await fs.ensureDir(this.getRevsPath());
+    await fs.ensureDir(this.getDataPath());
+  }
+  private async ensureRevs(name: string): Promise<void> {
+    await fs.ensureDir(this.getRevsPath(name));
   }
   private async ensureRepo(): Promise<void> {
     if (!(await fs.exists(this.getRepoPath()))) {
       await this.clone();
     }
-  }
-  private async ensureRev(hash: string): Promise<void> {
-    const revPath = await this.getRevPath(hash);
-    await fs.ensureDir(revPath);
   }
   private async clone(): Promise<void> {
     process.stdout.write(`Cloning ${this.branch} ...\r`);
@@ -104,8 +104,9 @@ export class GitHistory {
     return filtered;
   }
   async analyze<A>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
-    const { filter = () => true, map, max } = analyzer;
+    const { filter = () => true, map, max, name = "default" } = analyzer;
     await this.ensureWorkspace();
+    await this.ensureRevs(name);
     await this.ensureRepo();
     const git = simplegit(this.getRepoPath());
     await git.checkout(this.branch);
@@ -116,25 +117,30 @@ export class GitHistory {
         `Analyzing ${i + 1}/${logs.length}`.padEnd(30) + "\r"
       );
       const log = logs[i];
-      await this.ensureRev(log.hash);
-      const dataPath = await this.getDataPath(log.hash);
-      if (!(await fs.exists(dataPath))) {
+      const revPath = await this.getRevPath(name, log.hash);
+      if (!(await fs.exists(revPath))) {
         await git.checkout(log.hash);
         const result = await map(log);
         const data = JSON.stringify(result || null, null, 2);
-        await fs.writeFile(dataPath, data);
+        await fs.writeFile(revPath, data);
       }
     }
     process.stdout.write("".padEnd(30) + "\r");
     console.log("Analyzing done.");
     const hashes = logs.map(l => l.hash);
     hashes.reverse();
-    return new AnalyzerResult(hashes, this.getDataPath.bind(this));
+    return new AnalyzerResult(hashes, this.getRevPath.bind(this, name));
   }
-  async clearCache(): Promise<void> {
-    const revsPath = this.getRevsPath();
+  async clearCache(name: string): Promise<void> {
+    const revsPath = this.getRevsPath(name);
     if (await fs.exists(revsPath)) {
       await fs.rimraf(revsPath);
+    }
+  }
+  async clearAllCaches(): Promise<void> {
+    const dataPath = this.getDataPath();
+    if (await fs.exists(dataPath)) {
+      await fs.rimraf(dataPath);
     }
   }
   async clean(): Promise<void> {
@@ -142,6 +148,6 @@ export class GitHistory {
     if (await fs.exists(repoPath)) {
       await fs.rimraf(repoPath);
     }
-    await this.clearCache();
+    await this.clearAllCaches();
   }
 }
