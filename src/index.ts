@@ -2,7 +2,17 @@ import * as simplegit from "simple-git/promise";
 import * as path from "path";
 import * as fs from "./fs";
 
-export interface DefaultLogFields {
+export interface LogFormat {
+  hash?: string;
+  date?: string;
+  message?: string;
+  refs?: string;
+  body?: string;
+  author_name?: string;
+  author_email?: string;
+}
+
+export interface Log {
   hash: string;
   date: string;
   message: string;
@@ -10,14 +20,15 @@ export interface DefaultLogFields {
   body: string;
   author_name: string;
   author_email: string;
+  tags: string[];
 }
 
-export interface Analyzer<A, L> {
+export interface Analyzer<A> {
   name?: string;
-  filter?: (log: L) => boolean;
-  map: (log: L) => Promise<A>;
+  filter?: (log: Log) => boolean;
+  map: (log: Log) => Promise<A>;
   max?: number;
-  format?: L;
+  format?: LogFormat;
   dateFormat?: string;
 }
 
@@ -88,27 +99,42 @@ export class GitHistory {
     process.stdout.write("".padEnd(50) + "\r");
     console.log(`Cloning ${this.branch} done.`);
   }
-  private async getLogs<L>(
+  private async getLogs(
     max: number,
-    filter: (log: L) => boolean,
-    format: L,
+    filter: (log: Log) => boolean,
+    format: LogFormat,
     dateFormat: string
-  ): Promise<readonly L[]> {
+  ): Promise<Log[]> {
     const git = simplegit(this.getRepoPath());
     const logs = await git.log({
       ...(max ? { "--max-count": String(max) } : {}),
       ...(dateFormat ? { "--date": `format:${dateFormat}` } : {}),
-      format
+      format: {
+        hash: "%H",
+        date: "%ai",
+        message: "%s",
+        refs: "%D",
+        body: "%b",
+        author_name: "%aN",
+        author_email: "%ae",
+        ...format
+      }
     });
-    const filtered = logs.all.filter(filter);
+    const filtered = logs.all
+      .map(log => ({ ...log, tags: this.getTags(log.refs) }))
+      .filter(filter);
     console.log(
       `Got ${logs.all.length} logs and narrowed it to ${filtered.length}.`
     );
     return filtered;
   }
-  async analyze<A, L extends { hash: string } = DefaultLogFields>(
-    analyzer: Analyzer<A, L>
-  ): Promise<AnalyzerResult<A>> {
+  private getTags(refs: string): string[] {
+    return refs
+      .split(",")
+      .filter(token => token.includes("tag:"))
+      .map(token => token.split("tag:")[1].trim());
+  }
+  async analyze<A>(analyzer: Analyzer<A>): Promise<AnalyzerResult<A>> {
     const {
       filter = () => true,
       map,

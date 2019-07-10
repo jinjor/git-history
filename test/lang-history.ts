@@ -1,4 +1,4 @@
-import { GitHistory, DefaultLogFields } from "../src";
+import { GitHistory, Log } from "../src";
 import * as glob from "fast-glob";
 import * as path from "path";
 import * as fs from "fs";
@@ -7,12 +7,6 @@ import { Lang, ts, elm, rs } from "./lang";
 
 type Langs = { [key: string]: number };
 type Result = { hash: string; date: string; langs: Langs };
-type Log = {
-  hash: string;
-  date: string;
-  message: string;
-  refs: string;
-};
 
 export async function run(url: string, branch: string, out: string) {
   const langs = [ts, elm, rs];
