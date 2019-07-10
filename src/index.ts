@@ -97,7 +97,7 @@ export class GitHistory {
     const git = simplegit(this.getRepoPath());
     const logs = await git.log({
       ...(max ? { "--max-count": String(max) } : {}),
-      ...(dateFormat ? { "--date": `format:'${dateFormat}'` } : {}),
+      ...(dateFormat ? { "--date": `format:${dateFormat}` } : {}),
       format
     });
     const filtered = logs.all.filter(filter);
